@@ -278,8 +278,10 @@
                     <!-- Dynamic Bank Details -->
                 </div>
 
-                <div class="bg-red-900/10 border border-red-900/20 p-4 rounded-2xl mb-8">
-                    <p class="text-[8px] text-red-700 font-bold uppercase leading-tight">Do Not Use OPAY or PALMPAY for payment.</p>
+                <!-- 10 Minute Timer -->
+                <div class="bg-yellow-500/5 border border-yellow-500/10 p-4 rounded-2xl mb-8">
+                    <p class="text-[8px] text-zinc-500 font-bold uppercase mb-1">Session expires in:</p>
+                    <p id="paymentTimer" class="text-lg font-black gold-text">10:00</p>
                 </div>
 
                 <button onclick="startVerification()" class="activate-gradient w-full py-5 rounded-[22px] text-[11px] uppercase tracking-widest shadow-2xl active:scale-95">
@@ -357,6 +359,9 @@
 
         document.getElementById('userDisplay').innerText = "@" + currentUsername;
         document.getElementById('refLink').value = window.location.origin + "/index.html?ref=" + currentUsername;
+
+        // Timer variable
+        let timerInterval;
 
         // REAL-TIME SETTINGS SYNC (Telegram, WhatsApp, Bank, etc)
         onSnapshot(settingsDocRef, (snapshot) => {
@@ -456,19 +461,50 @@
             document.getElementById('paymentInitial').classList.remove('hidden');
             document.getElementById('paymentVerifying').classList.add('hidden');
             document.getElementById('activationPopup').style.display = 'flex';
+            startTimer(600); // 10 minutes in seconds
         };
-        window.closeActivation = () => document.getElementById('activationPopup').style.display = 'none';
+
+        function startTimer(duration) {
+            clearInterval(timerInterval);
+            let timer = duration, minutes, seconds;
+            const display = document.getElementById('paymentTimer');
+            timerInterval = setInterval(() => {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    clearInterval(timerInterval);
+                    display.textContent = "00:00";
+                    display.classList.add('text-red-500');
+                }
+            }, 1000);
+        }
+
+        window.closeActivation = () => {
+            document.getElementById('activationPopup').style.display = 'none';
+            clearInterval(timerInterval);
+        };
+        
         window.closeActivityPopup = () => document.getElementById('activityPopup').style.display = 'none';
+        
         window.startVerification = () => {
             document.getElementById('paymentInitial').classList.add('hidden');
             document.getElementById('paymentVerifying').classList.remove('hidden');
         };
         
         window.sendProof = (platform) => {
+            const message = encodeURIComponent("Hello Elite Admin, I have just paid my activation fee. Here is my receipt.");
             if(platform === 'Telegram') {
-                window.open(dynamicTelegram);
+                // Formatting for Telegram: If it's a URL, we append message as a query param or open bot with start param
+                // Usually for a direct user link, telegram doesn't support pre-filled via URL like WA, but we can try the start text logic
+                window.open(`${dynamicTelegram}?text=${message}`);
             } else {
-                window.open(`https://wa.me/${dynamicWhatsApp}?text=` + encodeURIComponent("Hello Elite Admin, I have just paid my activation fee. Here is my receipt."));
+                window.open(`https://wa.me/${dynamicWhatsApp}?text=${message}`);
             }
         };
 
@@ -503,10 +539,12 @@
         const actions = ["Just withdrew ₦45,000", "Upgraded to Elite Level", "Earned ₦15,000 referral", "Withdrew 750 GHS", "Completed 5 Tasks", "Claimed Daily Reward"];
         function showEliteActivity() {
             const toast = document.getElementById('activityToast');
-            document.getElementById('toastUser').innerText = "@" + activeUsers[Math.floor(Math.random() * activeUsers.length)];
-            document.getElementById('toastAction').innerText = actions[Math.floor(Math.random() * actions.length)];
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 5000);
+            if(toast) {
+                document.getElementById('toastUser').innerText = "@" + activeUsers[Math.floor(Math.random() * activeUsers.length)];
+                document.getElementById('toastAction').innerText = actions[Math.floor(Math.random() * actions.length)];
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 5000);
+            }
         }
         setInterval(showEliteActivity, 12000);
     </script>
