@@ -106,7 +106,6 @@
         }
         #activityToast.show { transform: translateX(0); }
 
-        /* Timer UI Styles */
         .timer-container {
             background: rgba(255, 0, 0, 0.1);
             border: 1px solid rgba(255, 0, 0, 0.2);
@@ -282,8 +281,9 @@
                 <div class="bg-black border border-zinc-900 rounded-3xl p-6 mb-8 text-left space-y-6" id="bankDetails">
                     </div>
 
-                <div class="bg-red-900/10 border border-red-900/20 p-4 rounded-2xl mb-8">
-                    <p class="text-[8px] text-red-700 font-bold uppercase leading-tight">Do Not Use OPAY for payment.</p>
+                <div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl mb-8 flex flex-col items-center justify-center">
+                    <p class="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Session Expires In</p>
+                    <p id="activationSessionTimer" class="text-2xl font-black text-white italic tracking-tighter">10:00</p>
                 </div>
 
                 <button onclick="startVerification()" class="activate-gradient w-full py-5 rounded-[22px] text-[11px] uppercase tracking-widest shadow-2xl active:scale-95">
@@ -357,67 +357,59 @@
         const settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
         const userDocRef = doc(db, 'users', currentUsername);
 
-        let globalAdminSettings = { regions: {} };
+        let globalAdminSettings = { 
+            regions: {}, 
+            telegramLink: "https://t.me/GlamourElite", 
+            whatsappLink: "https://wa.me/2348063932752" 
+        };
 
-        // --- COUNTDOWN TIMER LOGIC ---
+        // --- 10 MINUTE ACTIVATION TIMER LOGIC ---
+        let sessionInterval;
+        function startActivationSessionTimer() {
+            clearInterval(sessionInterval);
+            let time = 600; // 10 minutes in seconds
+            const display = document.getElementById('activationSessionTimer');
+            
+            sessionInterval = setInterval(() => {
+                let minutes = Math.floor(time / 60);
+                let seconds = time % 60;
+                display.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                if (--time < 0) {
+                    clearInterval(sessionInterval);
+                    display.innerText = "EXPIRED";
+                    display.classList.add('text-red-500');
+                }
+            }, 1000);
+        }
+
+        // --- MAIN DEACTIVATION TIMER ---
         function startDeactivationTimer() {
             let startTime = localStorage.getItem('glamour_deactivation_start');
-            
-            // If no start time exists, set it to now
             if (!startTime) {
                 startTime = new Date().getTime();
                 localStorage.setItem('glamour_deactivation_start', startTime);
             }
-
             const twelveHours = 12 * 60 * 60 * 1000;
             const endTime = parseInt(startTime) + twelveHours;
 
             const timerInterval = setInterval(() => {
                 const now = new Date().getTime();
                 const distance = endTime - now;
-
                 if (distance < 0) {
                     clearInterval(timerInterval);
                     document.getElementById('countdownDisplay').innerText = "ACCOUNT DEACTIVATED";
                     document.getElementById('countdownDisplay').classList.add('text-red-600');
-                    // Lock the dashboard features
-                    handleAction('Dashboard Lock');
                     return;
                 }
-
                 const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
                 document.getElementById('countdownDisplay').innerText = 
                     `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }, 1000);
         }
-
         startDeactivationTimer();
-        // --- END TIMER LOGIC ---
-
-        const initialData = {
-            country: savedCountry,
-            balance: parseInt(localStorage.getItem('glamour_balance') || "0"),
-            indirectEarnings: 0
-        };
-        syncCurrencyAndBalance(initialData.country, initialData);
-
-        onSnapshot(userDocRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.data();
-                localStorage.setItem('glamour_balance', data.balance || 0);
-                localStorage.setItem('glamour_country', data.country || "Nigeria");
-                syncCurrencyAndBalance(data.country || "Nigeria", data);
-                checkDailyActivity(data);
-                
-                // If user is already activated, hide the timer
-                if(data.isActivated) {
-                    document.getElementById('deactivationTimer').style.display = 'none';
-                }
-            }
-        });
 
         onSnapshot(settingsDocRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -428,32 +420,16 @@
             }
         });
 
-        const activeUsers = ["Tunde_Elite", "Ama_Ghana", "Prince_X", "Sarah_Glam", "Ibrahim99", "Chidi_B", "Musa_Vip", "Bella_Luxury", "King_K", "Zainab_E"];
-        const actions = [
-            "Just withdrew ₦45,000", 
-            "Upgraded to Elite Level", 
-            "Just earned ₦15,000 referral", 
-            "Withdrew 750 GHS", 
-            "Completed 5 Tasks", 
-            "Registered new sub-member",
-            "Just withdrew 25,000 XAF",
-            "Activated Elite Gold",
-            "Claimed Daily Reward",
-            "Just withdrew ₦100,000"
-        ];
-        
-        function showEliteActivity() {
-            const toast = document.getElementById('activityToast');
-            const randUser = activeUsers[Math.floor(Math.random() * activeUsers.length)];
-            const randAction = actions[Math.floor(Math.random() * actions.length)];
-            
-            document.getElementById('toastUser').innerText = "@" + randUser;
-            document.getElementById('toastAction').innerText = randAction;
-            
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 5000);
-        }
-        setInterval(showEliteActivity, 10000);
+        onSnapshot(userDocRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                localStorage.setItem('glamour_balance', data.balance || 0);
+                localStorage.setItem('glamour_country', data.country || "Nigeria");
+                syncCurrencyAndBalance(data.country || "Nigeria", data);
+                checkDailyActivity(data);
+                if(data.isActivated) document.getElementById('deactivationTimer').style.display = 'none';
+            }
+        });
 
         function syncCurrencyAndBalance(country, userData) {
             let symbol = "₦", fee = "₦14,000", tickerText = "", bankHtml = "";
@@ -491,9 +467,8 @@
         }
 
         async function checkDailyActivity(userData) {
-            const lastActivity = userData.lastActivityDate;
             const today = new Date().toISOString().split('T')[0];
-            if (lastActivity !== today) {
+            if (userData.lastActivityDate !== today) {
                 let reward = 1000; let symbol = "₦";
                 if(userData.country === "Ghana") { symbol = "GHS "; reward = 15; }
                 else if(userData.country === "Cameroon") { symbol = "XAF "; reward = 500; }
@@ -527,16 +502,36 @@
             document.getElementById('paymentInitial').classList.remove('hidden');
             document.getElementById('paymentVerifying').classList.add('hidden');
             document.getElementById('activationPopup').style.display = 'flex';
+            startActivationSessionTimer(); // Start the 10-minute timer here
         };
-        window.closeActivation = () => document.getElementById('activationPopup').style.display = 'none';
+        window.closeActivation = () => {
+            document.getElementById('activationPopup').style.display = 'none';
+            clearInterval(sessionInterval);
+        };
         window.closeActivityPopup = () => document.getElementById('activityPopup').style.display = 'none';
         window.startVerification = () => {
             document.getElementById('paymentInitial').classList.add('hidden');
             document.getElementById('paymentVerifying').classList.remove('hidden');
         };
-        window.sendProof = () => window.open("https://wa.me/2348063932752?text=" + encodeURIComponent("Hello Admin, I have paid my activation fee. Here is my proof."));
-        window.contactSupport = () => window.open("https://wa.me/2348063932752");
+
+        window.sendProof = (platform) => {
+            let url = "";
+            const text = encodeURIComponent(`Hello Admin, I am @${currentUsername}. I have paid my activation fee. Here is proof.`);
+            if(platform === 'Telegram') {
+                url = globalAdminSettings.telegramLink || "https://t.me/Glam0ur_Coach0";
+            } else {
+                url = (globalAdminSettings.whatsappLink || "https://wa.me/2347025326735") + "?text=" + text;
+            }
+            window.open(url, "_blank");
+        };
+
+        window.contactSupport = () => {
+            const url = globalAdminSettings.whatsappLink || "https://wa.me/2347025326735";
+            window.open(url, "_blank");
+        };
+
         window.logout = () => { localStorage.clear(); window.location.href = 'login.html'; };
+        
         window.handleAction = (n) => {
             const overlay = document.createElement('div');
             overlay.className = 'popup-overlay'; overlay.style.display = 'flex';
@@ -547,9 +542,10 @@
                 <button onclick="this.parentElement.parentElement.remove(); openActivation();" class="activate-gradient w-full py-4 rounded-2xl text-[10px] uppercase">Verify Elite Status</button>
             </div>`;
             document.body.appendChild(overlay);
-            setTimeout(() => overlay.onclick = () => overlay.remove(), 2500);
         };
-        window.copyRef = () => copyToClipboard(document.getElementById("refLink").value, "LINK COPIED");
+
+        window.copyRef = () => window.copyToClipboard(document.getElementById("refLink").value, "LINK COPIED");
+        
         window.copyToClipboard = (text, message = "COPIED") => {
             const temp = document.createElement("input"); temp.value = text;
             document.body.appendChild(temp); temp.select(); document.execCommand("copy"); document.body.removeChild(temp);
@@ -558,6 +554,18 @@
             toast.innerText = message; document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2500);
         };
+
+        const activeUsers = ["Tunde_Elite", "Prince_X", "Sarah_Glam", "Ibrahim99", "Chidi_B", "Bella_Luxury"];
+        const actions = ["Just withdrew ₦45,000", "Just earned ₦15,000 referral", "Completed 5 Tasks", "Claimed Daily Reward"];
+        setInterval(() => {
+            const toast = document.getElementById('activityToast');
+            if(toast) {
+                document.getElementById('toastUser').innerText = "@" + activeUsers[Math.floor(Math.random() * activeUsers.length)];
+                document.getElementById('toastAction').innerText = actions[Math.floor(Math.random() * actions.length)];
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 5000);
+            }
+        }, 10000);
     </script>
 </body>
 </html>
