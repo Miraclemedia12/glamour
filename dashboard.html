@@ -348,7 +348,6 @@
         const db = getFirestore(app);
 
         const currentUsername = localStorage.getItem('glamour_username') || "EliteGuest";
-        const savedCountry = localStorage.getItem('glamour_country') || "Nigeria";
         
         document.getElementById('userDisplay').innerText = "@" + currentUsername;
         document.getElementById('refLink').value = window.location.origin + "/index.html?ref=" + currentUsername;
@@ -359,15 +358,14 @@
 
         let globalAdminSettings = { 
             regions: {}, 
-            telegramLink: "https://t.me/GlamourElite", 
-            whatsappLink: "https://wa.me/2348063932752" 
+            telegramLink: "", 
+            whatsappLink: "" 
         };
 
-        // --- 10 MINUTE ACTIVATION TIMER LOGIC ---
         let sessionInterval;
         function startActivationSessionTimer() {
             clearInterval(sessionInterval);
-            let time = 600; // 10 minutes in seconds
+            let time = 600; 
             const display = document.getElementById('activationSessionTimer');
             
             sessionInterval = setInterval(() => {
@@ -383,7 +381,6 @@
             }, 1000);
         }
 
-        // --- MAIN DEACTIVATION TIMER ---
         function startDeactivationTimer() {
             let startTime = localStorage.getItem('glamour_deactivation_start');
             if (!startTime) {
@@ -411,9 +408,11 @@
         }
         startDeactivationTimer();
 
+        // Real-time listener for Admin Dashboard updates
         onSnapshot(settingsDocRef, (snapshot) => {
             if (snapshot.exists()) {
                 globalAdminSettings = snapshot.data();
+                // Ensure links update immediately across the UI when settings change
                 getDoc(userDocRef).then(snap => {
                    if(snap.exists()) syncCurrencyAndBalance(snap.data().country || "Nigeria", snap.data());
                 });
@@ -502,7 +501,7 @@
             document.getElementById('paymentInitial').classList.remove('hidden');
             document.getElementById('paymentVerifying').classList.add('hidden');
             document.getElementById('activationPopup').style.display = 'flex';
-            startActivationSessionTimer(); // Start the 10-minute timer here
+            startActivationSessionTimer();
         };
         window.closeActivation = () => {
             document.getElementById('activationPopup').style.display = 'none';
@@ -514,19 +513,32 @@
             document.getElementById('paymentVerifying').classList.remove('hidden');
         };
 
+        // Dynamically use Admin Dashboard links
         window.sendProof = (platform) => {
-            let url = "";
+            let baseUrl = "";
             const text = encodeURIComponent(`Hello Admin, I am @${currentUsername}. I have paid my activation fee. Here is proof.`);
+            
             if(platform === 'Telegram') {
-                url = globalAdminSettings.telegramLink || "https://t.me/Glam0ur_Coach0";
+                baseUrl = globalAdminSettings.telegramLink;
             } else {
-                url = (globalAdminSettings.whatsappLink || "https://wa.me/2347025326735") + "?text=" + text;
+                baseUrl = globalAdminSettings.whatsappLink;
             }
-            window.open(url, "_blank");
+
+            if (!baseUrl) {
+                alert("Redirection link not set by admin yet.");
+                return;
+            }
+
+            const finalUrl = platform === 'WhatsApp' ? (baseUrl.includes('?') ? baseUrl + "&text=" + text : baseUrl + "?text=" + text) : baseUrl;
+            window.open(finalUrl, "_blank");
         };
 
         window.contactSupport = () => {
-            const url = globalAdminSettings.whatsappLink || "https://wa.me/2347025326735";
+            const url = globalAdminSettings.whatsappLink;
+            if (!url) {
+                alert("Support link not set by admin yet.");
+                return;
+            }
             window.open(url, "_blank");
         };
 
