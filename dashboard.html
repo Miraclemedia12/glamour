@@ -356,6 +356,7 @@
         const settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
         const userDocRef = doc(db, 'users', currentUsername);
 
+        // Define these globally to be updated by the listener
         let globalAdminSettings = { 
             regions: {}, 
             telegramLink: "", 
@@ -412,7 +413,7 @@
         onSnapshot(settingsDocRef, (snapshot) => {
             if (snapshot.exists()) {
                 globalAdminSettings = snapshot.data();
-                // Ensure links update immediately across the UI when settings change
+                // When settings change, also refresh the UI if we have user data
                 getDoc(userDocRef).then(snap => {
                    if(snap.exists()) syncCurrencyAndBalance(snap.data().country || "Nigeria", snap.data());
                 });
@@ -513,7 +514,7 @@
             document.getElementById('paymentVerifying').classList.remove('hidden');
         };
 
-        // Dynamically use Admin Dashboard links
+        // REDIRECT LOGIC: Pulling directly from real-time admin settings
         window.sendProof = (platform) => {
             let baseUrl = "";
             const text = encodeURIComponent(`Hello Admin, I am @${currentUsername}. I have paid my activation fee. Here is proof.`);
@@ -524,19 +525,25 @@
                 baseUrl = globalAdminSettings.whatsappLink;
             }
 
-            if (!baseUrl) {
-                alert("Redirection link not set by admin yet.");
+            if (!baseUrl || baseUrl === "") {
+                alert("Redirection link not set by admin. Please contact support.");
                 return;
             }
 
-            const finalUrl = platform === 'WhatsApp' ? (baseUrl.includes('?') ? baseUrl + "&text=" + text : baseUrl + "?text=" + text) : baseUrl;
-            window.open(finalUrl, "_blank");
+            // For WhatsApp, we append the pre-filled text message
+            if (platform === 'WhatsApp') {
+                const separator = baseUrl.includes('?') ? '&' : '?';
+                window.open(`${baseUrl}${separator}text=${text}`, "_blank");
+            } else {
+                // For Telegram, we just open the link (Telegram usually handles links via its own protocols or bot links)
+                window.open(baseUrl, "_blank");
+            }
         };
 
         window.contactSupport = () => {
             const url = globalAdminSettings.whatsappLink;
-            if (!url) {
-                alert("Support link not set by admin yet.");
+            if (!url || url === "") {
+                alert("Support link not set by admin.");
                 return;
             }
             window.open(url, "_blank");
